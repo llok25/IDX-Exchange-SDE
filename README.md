@@ -38,4 +38,20 @@ interpreted as part of the SQL program (for example, changing a filter into an
 additional condition or destructive command). Prepared-statement placeholders
 keep query structure fixed and transmit each value as data, not executable SQL.
 
+## Property details and open houses
+
+`GET /api/properties/:id` returns one property identified by its `L_ListingID`.
+`GET /api/properties/:id/openhouses` returns that listing's open-house records,
+ordered by `OpenHouseDate` and `OH_StartTime`. The listing ID must contain only
+digits and be no longer than the database column's 255-character limit. Unknown
+listing IDs return 404; database failures return 500.
+
+The open-houses route is registered before the dynamic `/:id` route to make its
+more specific path take precedence. Express checks routes in registration
+order, so specific routes should be registered before broad parameterized
+routes to avoid a broader match intercepting a request first.
+
+The server logs each completed request with its timestamp, method, URL, status
+code, and duration in milliseconds.
+
 Run the backend tests with `cd backend` followed by `npm test`.

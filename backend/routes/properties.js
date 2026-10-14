@@ -114,6 +114,13 @@ function buildWhere(filters) {
   };
 }
 
+function parseListingId(id) {
+  if (typeof id !== 'string' || id.length > 255 || !/^\d+$/.test(id)) {
+    throw new Error('id must be a numeric listing ID containing at most 255 digits.');
+  }
+  return id;
+}
+
 function createPropertiesRouter(database = db) {
   const router = express.Router();
 
@@ -145,6 +152,64 @@ function createPropertiesRouter(database = db) {
     } catch (error) {
       console.error('Property search database failure:', error.message);
       return res.status(500).json({ error: 'Failed to retrieve properties.' });
+    }
+  });
+
+  router.get('/:id/openhouses', async (req, res) => {
+    let listingId;
+    try {
+      listingId = parseListingId(req.params.id);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    try {
+      const [properties] = await database.execute(
+        'SELECT L_ListingID FROM rets_property WHERE L_ListingID = ? ORDER BY id LIMIT 1',
+        [listingId],
+      );
+      if (properties.length === 0) {
+        const [openhouses] = await database.execute(
+          'SELECT * FROM rets_openhouse WHERE L_ListingID = ? ORDER BY OpenHouseDate, OH_StartTime',
+          [listingId],
+        );
+        if (openhouses.length > 0) {
+          return res.json(openhouses);
+        }
+        return res.status(404).json({ error: `Property with listing ID ${listingId} not found.` });
+      }
+
+      const [openhouses] = await database.execute(
+        'SELECT * FROM rets_openhouse WHERE L_ListingID = ? ORDER BY OpenHouseDate, OH_StartTime',
+        [listingId],
+      );
+      return res.json(openhouses);
+    } catch (error) {
+      console.error('Open-house lookup database failure:', error.message);
+      return res.status(500).json({ error: 'Failed to retrieve open houses.' });
+    }
+  });
+
+  router.get('/:id', async (req, res) => {
+    let listingId;
+    try {
+      listingId = parseListingId(req.params.id);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    try {
+      const [properties] = await database.execute(
+        'SELECT * FROM rets_property WHERE L_ListingID = ? ORDER BY id LIMIT 1',
+        [listingId],
+      );
+      if (properties.length === 0) {
+        return res.status(404).json({ error: `Property with listing ID ${listingId} not found.` });
+      }
+      return res.json(properties[0]);
+    } catch (error) {
+      console.error('Property lookup database failure:', error.message);
+      return res.status(500).json({ error: 'Failed to retrieve property.' });
     }
   });
 
