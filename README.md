@@ -55,3 +55,12 @@ The server logs each completed request with its timestamp, method, URL, status
 code, and duration in milliseconds.
 
 Run the backend tests with `cd backend` followed by `npm test`.
+
+## Listings frontend
+
+Run the React listings page with `cd frontend`, `npm install`, and `npm run dev`.
+The Vite development server listens on port 3000 and proxies `/api` requests to
+the Express server on port 5000. Start the backend separately. The page loads
+the first 20 properties and displays the total result count; property images
+are parsed defensively from `L_Photos` and listings without usable photos show
+a placeholder instead.

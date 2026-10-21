@@ -1,0 +1,6 @@
+Dockerfile
+node_modules/
+frontend/dist/
+california_sold.sql
+rets_openhouse.sql
+rets_property.sql
