@@ -125,6 +125,85 @@ a {
   font-size: 15px;
 }
 
+.property-filters {
+  margin-bottom: 48px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.property-filters__fields {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.property-filters__field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: #59625a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.property-filters__field input,
+.property-filters__field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #dedfd7;
+  border-radius: 6px;
+  color: #303b32;
+  background: #fbfbf9;
+  font: inherit;
+  font-weight: 400;
+}
+
+.property-filters__field input:focus,
+.property-filters__field select:focus {
+  outline: 3px solid #dce5dc;
+  border-color: #7c9a7e;
+}
+
+.property-filters__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 17px;
+}
+
+.property-filters__actions button {
+  min-height: 42px;
+  padding: 0 17px;
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.property-filters__search {
+  color: #fff;
+  background: var(--green);
+}
+
+.property-filters__search:hover {
+  background: var(--green-dark);
+}
+
+.property-filters__clear {
+  color: var(--green);
+  background: transparent;
+}
+
+.property-filters__actions button:focus-visible {
+  outline: 3px solid #9aae9b;
+  outline-offset: 3px;
+}
+
 .listings__toolbar {
   min-height: 73px;
   display: flex;
@@ -392,6 +471,10 @@ a {
   .property-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .property-filters__fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 780px) {
@@ -405,6 +488,11 @@ a {
 
   .listings__intro {
     margin-bottom: 43px;
+  }
+
+  .property-filters {
+    margin-bottom: 38px;
+    padding: 17px;
   }
 
   .listings__intro h1 {
@@ -465,6 +553,10 @@ a {
   .property-grid {
     grid-template-columns: 1fr;
     gap: 15px;
+  }
+
+  .property-filters__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .property-card__photo-wrap {

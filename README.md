@@ -64,3 +64,7 @@ the Express server on port 5000. Start the backend separately. The page loads
 the first 20 properties and displays the total result count; property images
 are parsed defensively from `L_Photos` and listings without usable photos show
 a placeholder instead.
+
+Use the filter form to combine city, ZIP code, price, beds, and baths criteria.
+Clear Filters resets the form and reloads all properties. Frontend API and
+component unit tests run with `cd frontend` followed by `npm test`.

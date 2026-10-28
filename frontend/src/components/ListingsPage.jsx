@@ -1,48 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchProperties } from '../api/client.js';
 import PropertyCard from './PropertyCard.jsx';
+import PropertyFilters, { EMPTY_FILTERS } from './PropertyFilters.js';
 
 const PAGE_SIZE = 20;
+
+function nonEmptyFilters(filters) {
+  return Object.fromEntries(
+    Object.entries(filters)
+      .map(([name, value]) => [name, typeof value === 'string' ? value.trim() : value])
+      .filter(([, value]) => value !== ''),
+  );
+}
 
 export default function ListingsPage() {
   const [listings, setListings] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState('');
   const loadMoreInFlight = useRef(false);
   const loadMoreController = useRef(null);
+  const searchController = useRef(null);
+  const searchRequestId = useRef(0);
   const loadMoreSentinel = useRef(null);
 
-  useEffect(() => {
+  const refreshListings = useCallback(async (nextFilters) => {
+    const requestFilters = nonEmptyFilters(nextFilters);
+    const requestId = searchRequestId.current + 1;
+    searchRequestId.current = requestId;
     const controller = new AbortController();
+    searchController.current?.abort();
+    searchController.current = controller;
+    loadMoreController.current?.abort();
+    loadMoreController.current = null;
+    loadMoreInFlight.current = false;
+    setLoadingMore(false);
+    setLoadMoreError('');
+    setListings([]);
+    setTotal(0);
+    setAppliedFilters(requestFilters);
+    setLoading(true);
+    setError('');
 
-    async function loadListings() {
-      setLoading(true);
-      setError('');
-      try {
-        const data = await fetchProperties(
-          { limit: PAGE_SIZE, offset: 0 },
-          { signal: controller.signal },
-        );
+    try {
+      const data = await fetchProperties(
+        { ...requestFilters, limit: PAGE_SIZE, offset: 0 },
+        { signal: controller.signal },
+      );
+      if (searchRequestId.current === requestId && !controller.signal.aborted) {
         setListings(data.results);
         setTotal(data.total);
-      } catch (requestError) {
-        if (!controller.signal.aborted) {
-          setError(requestError.message || 'Listings could not be loaded.');
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+      }
+    } catch (requestError) {
+      if (!controller.signal.aborted && searchRequestId.current === requestId) {
+        setError(requestError.message || 'Listings could not be loaded.');
+      }
+    } finally {
+      if (!controller.signal.aborted && searchRequestId.current === requestId) {
+        setLoading(false);
+        searchController.current = null;
       }
     }
+  }, []);
 
-    loadListings();
+  useEffect(() => {
+    refreshListings({});
     return () => {
-      controller.abort();
+      searchController.current?.abort();
       loadMoreController.current?.abort();
     };
-  }, []);
+  }, [refreshListings]);
 
   const loadNextPage = useCallback(async () => {
     if (loadMoreInFlight.current || listings.length >= total) return;
@@ -55,9 +86,10 @@ export default function ListingsPage() {
 
     try {
       const data = await fetchProperties(
-        { limit: PAGE_SIZE, offset: listings.length },
+        { ...appliedFilters, limit: PAGE_SIZE, offset: listings.length },
         { signal: controller.signal },
       );
+      if (controller.signal.aborted) return;
       if (data.results.length === 0) {
         setLoadMoreError('No additional properties were returned. Please try again.');
         return;
@@ -69,13 +101,13 @@ export default function ListingsPage() {
         setLoadMoreError(requestError.message || 'More properties could not be loaded.');
       }
     } finally {
-      if (!controller.signal.aborted) {
+      if (loadMoreController.current === controller) {
         loadMoreInFlight.current = false;
         loadMoreController.current = null;
         setLoadingMore(false);
       }
     }
-  }, [listings.length, total]);
+  }, [appliedFilters, listings.length, total]);
 
   const hasMore = listings.length < total;
 
@@ -113,6 +145,16 @@ export default function ListingsPage() {
           </p>
         </div>
 
+        <PropertyFilters
+          filters={filters}
+          onChange={setFilters}
+          onSearch={refreshListings}
+          onClear={() => {
+            setFilters(EMPTY_FILTERS);
+            refreshListings(EMPTY_FILTERS);
+          }}
+        />
+
         <div className="listings__toolbar">
           <div>
             <h2>Featured listings</h2>
@@ -139,7 +181,7 @@ export default function ListingsPage() {
         ) : listings.length === 0 ? (
           <div className="state-panel">
             <h2>No properties found</h2>
-            <p>Please check back soon for new listings.</p>
+            <p>Try adjusting your filters or clear them to see all available properties.</p>
           </div>
         ) : (
           <div className="property-grid">
