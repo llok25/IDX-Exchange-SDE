@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchProperties } from '../api/client.js';
 import PropertyCard from './PropertyCard.jsx';
 import PropertyFilters, { EMPTY_FILTERS } from './PropertyFilters.js';
+import Pagination from './Pagination.js';
 
-const PAGE_SIZE = 20;
+const DEFAULT_ITEMS_PER_PAGE = 20;
 
 function nonEmptyFilters(filters) {
   return Object.fromEntries(
@@ -20,108 +21,66 @@ export default function ListingsPage() {
   const [error, setError] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState({});
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState('');
-  const loadMoreInFlight = useRef(false);
-  const loadMoreController = useRef(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const searchController = useRef(null);
   const searchRequestId = useRef(0);
-  const loadMoreSentinel = useRef(null);
 
-  const refreshListings = useCallback(async (nextFilters) => {
-    const requestFilters = nonEmptyFilters(nextFilters);
+  const refreshListings = useCallback((nextFilters) => {
+    setCurrentPage(1);
+    setAppliedFilters(nonEmptyFilters(nextFilters));
+  }, []);
+
+  useEffect(() => {
     const requestId = searchRequestId.current + 1;
     searchRequestId.current = requestId;
     const controller = new AbortController();
     searchController.current?.abort();
     searchController.current = controller;
-    loadMoreController.current?.abort();
-    loadMoreController.current = null;
-    loadMoreInFlight.current = false;
-    setLoadingMore(false);
-    setLoadMoreError('');
     setListings([]);
     setTotal(0);
-    setAppliedFilters(requestFilters);
     setLoading(true);
     setError('');
 
-    try {
-      const data = await fetchProperties(
-        { ...requestFilters, limit: PAGE_SIZE, offset: 0 },
-        { signal: controller.signal },
-      );
+    fetchProperties(
+      {
+        ...appliedFilters,
+        limit: itemsPerPage,
+        offset: (currentPage - 1) * itemsPerPage,
+      },
+      { signal: controller.signal },
+    ).then((data) => {
       if (searchRequestId.current === requestId && !controller.signal.aborted) {
         setListings(data.results);
         setTotal(data.total);
       }
-    } catch (requestError) {
+    }).catch((requestError) => {
       if (!controller.signal.aborted && searchRequestId.current === requestId) {
         setError(requestError.message || 'Listings could not be loaded.');
       }
-    } finally {
+    }).finally(() => {
       if (!controller.signal.aborted && searchRequestId.current === requestId) {
         setLoading(false);
         searchController.current = null;
       }
-    }
+    });
+
+    return () => {
+      controller.abort();
+      if (searchController.current === controller) {
+        searchController.current = null;
+      }
+    };
+  }, [appliedFilters, currentPage, itemsPerPage]);
+
+  const changePage = useCallback((page) => {
+    setCurrentPage(page);
+    window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => {
-    refreshListings({});
-    return () => {
-      searchController.current?.abort();
-      loadMoreController.current?.abort();
-    };
-  }, [refreshListings]);
-
-  const loadNextPage = useCallback(async () => {
-    if (loadMoreInFlight.current || listings.length >= total) return;
-
-    loadMoreInFlight.current = true;
-    const controller = new AbortController();
-    loadMoreController.current = controller;
-    setLoadingMore(true);
-    setLoadMoreError('');
-
-    try {
-      const data = await fetchProperties(
-        { ...appliedFilters, limit: PAGE_SIZE, offset: listings.length },
-        { signal: controller.signal },
-      );
-      if (controller.signal.aborted) return;
-      if (data.results.length === 0) {
-        setLoadMoreError('No additional properties were returned. Please try again.');
-        return;
-      }
-      setListings((currentListings) => [...currentListings, ...data.results]);
-      setTotal(data.total);
-    } catch (requestError) {
-      if (!controller.signal.aborted) {
-        setLoadMoreError(requestError.message || 'More properties could not be loaded.');
-      }
-    } finally {
-      if (loadMoreController.current === controller) {
-        loadMoreInFlight.current = false;
-        loadMoreController.current = null;
-        setLoadingMore(false);
-      }
-    }
-  }, [appliedFilters, listings.length, total]);
-
-  const hasMore = listings.length < total;
-
-  useEffect(() => {
-    if (!hasMore || loading || loadingMore || loadMoreError || !loadMoreSentinel.current) return;
-    if (typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) loadNextPage();
-    }, { rootMargin: '300px' });
-    observer.observe(loadMoreSentinel.current);
-
-    return () => observer.disconnect();
-  }, [hasMore, loading, loadingMore, loadMoreError, loadNextPage]);
+  const totalPages = Math.ceil(total / itemsPerPage);
+  const firstResult = total === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const lastResult = Math.min(currentPage * itemsPerPage, total);
 
   return (
     <main className="page-shell">
@@ -161,7 +120,7 @@ export default function ListingsPage() {
             <p className="listings__count" aria-live="polite">
               {loading
                 ? 'Loading properties…'
-                : `Showing ${Math.min(listings.length, total).toLocaleString('en-US')} of ${total.toLocaleString('en-US')} properties`}
+                : `Showing ${firstResult.toLocaleString('en-US')}-${lastResult.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} properties`}
             </p>
           </div>
           <span className="toolbar-label">Latest listings</span>
@@ -184,33 +143,21 @@ export default function ListingsPage() {
             <p>Try adjusting your filters or clear them to see all available properties.</p>
           </div>
         ) : (
-          <div className="property-grid">
-            {listings.map((property) => (
-              <PropertyCard
-                key={`${property.L_ListingID || 'listing'}-${property.id}`}
-                property={property}
-              />
-            ))}
-          </div>
-        )}
-        {!loading && !error && hasMore && (
-          <div className="listings__pagination" ref={loadMoreSentinel}>
-            {loadMoreError && (
-              <p className="listings__pagination-error" role="alert">{loadMoreError}</p>
-            )}
-            <button
-              className="load-more-button"
-              type="button"
-              onClick={loadNextPage}
-              disabled={loadingMore}
-            >
-              {loadingMore
-                ? 'Loading properties…'
-                : loadMoreError
-                  ? 'Retry loading properties'
-                  : `Show next ${Math.min(PAGE_SIZE, total - listings.length)} properties`}
-            </button>
-          </div>
+          <>
+            <div className="property-grid">
+              {listings.map((property) => (
+                <PropertyCard
+                  key={`${property.L_ListingID || 'listing'}-${property.id}`}
+                  property={property}
+                />
+              ))}
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={changePage}
+            />
+          </>
         )}
       </section>
 
