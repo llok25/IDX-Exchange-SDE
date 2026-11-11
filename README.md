@@ -68,3 +68,22 @@ a placeholder instead.
 Use the filter form to combine city, ZIP code, price, beds, and baths criteria.
 Clear Filters resets the form and reloads all properties. Frontend API and
 component unit tests run with `cd frontend` followed by `npm test`.
+
+Property cards link to `/property/:id`. The detail page shows the listing photos,
+description, property facts, map, and open houses. Open-house remarks are read
+from the `OpenHouseRemarks` field in each record's `all_data` JSON value.
+
+### Google Maps Embed API
+
+The detail page uses the Google Maps Embed API iframe and does not require a
+Maps npm package. Create a Google Cloud project, enable **Maps Embed API**, and
+create an API key in **APIs & Services > Credentials**. Restrict the key to the
+Maps Embed API and the `http://localhost:3000/*` HTTP referrer. Add this to
+`frontend/.env` (do not commit the key):
+
+```env
+REACT_APP_GOOGLE_MAPS_API_KEY=your_key
+```
+
+Vite is configured to expose this `REACT_APP_` variable to the frontend.
+Restart the frontend dev server after changing `.env`.

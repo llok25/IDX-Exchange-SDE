@@ -43,3 +43,7 @@ export function fetchProperties(params = {}, { signal } = {}) {
 export function fetchPropertyDetail(id, { signal } = {}) {
   return getJson(`${API_BASE}/${encodeURIComponent(id)}`, { signal });
 }
+
+export function fetchOpenHouses(id, { signal } = {}) {
+  return getJson(`${API_BASE}/${encodeURIComponent(id)}/openhouses`, { signal });
+}

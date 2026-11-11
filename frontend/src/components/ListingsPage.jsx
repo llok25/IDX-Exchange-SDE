@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchProperties } from '../api/client.js';
 import PropertyCard from './PropertyCard.jsx';
 import PropertyFilters, { EMPTY_FILTERS } from './PropertyFilters.js';
@@ -85,10 +86,10 @@ export default function ListingsPage() {
   return (
     <main className="page-shell">
       <header className="site-header">
-        <a className="brand" href="/" aria-label="IDX Exchange home">
+        <Link className="brand" to="/" aria-label="IDX Exchange home">
           <span className="brand__symbol" aria-hidden="true">i</span>
           <span>IDX<span className="brand__light">exchange</span></span>
-        </a>
+        </Link>
         <div className="header-note">
           <span className="status-dot" aria-hidden="true" />
           California properties

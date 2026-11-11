@@ -1,16 +1,19 @@
-export function getFirstPhoto(value) {
+export function getPhotos(value) {
   if (typeof value === 'string') {
     try {
       value = JSON.parse(value);
     } catch {
-      return null;
+      return [];
     }
   }
 
-  if (!Array.isArray(value)) return null;
+  if (!Array.isArray(value)) return [];
 
-  const firstUrl = value.find(
+  return value.filter(
     (item) => typeof item === 'string' && /^https?:\/\//i.test(item.trim()),
-  );
-  return firstUrl ? firstUrl.trim() : null;
+  ).map((item) => item.trim());
+}
+
+export function getFirstPhoto(value) {
+  return getPhotos(value)[0] || null;
 }

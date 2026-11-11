@@ -1,4 +1,5 @@
-import { getFirstPhoto } from '../utils/photos.js';
+import { useNavigate } from 'react-router-dom';
+import PropertyImageCarousel from './PropertyImageCarousel.jsx';
 
 const currency = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -11,7 +12,8 @@ function displayValue(value) {
 }
 
 export default function PropertyCard({ property }) {
-  const photo = getFirstPhoto(property.L_Photos);
+  const navigate = useNavigate();
+  const listingId = property.L_ListingID || property.id;
   const hasPrice = property.L_SystemPrice !== null
     && property.L_SystemPrice !== undefined
     && property.L_SystemPrice !== ''
@@ -22,24 +24,22 @@ export default function PropertyCard({ property }) {
     && Number.isFinite(Number(property.LM_Int2_3));
 
   return (
-    <article className="property-card">
+    <article
+      className="property-card"
+      role="link"
+      tabIndex={0}
+      aria-label={`View property at ${property.L_Address || 'this listing'}`}
+      onClick={() => navigate(`/property/${encodeURIComponent(listingId)}`)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          navigate(`/property/${encodeURIComponent(listingId)}`);
+        }
+      }}
+    >
       <div className="property-card__photo-wrap">
-        {photo ? (
-          <img
-            className="property-card__photo"
-            src={photo}
-            alt={`Home at ${property.L_Address || 'this listing'}`}
-            loading="lazy"
-            onError={(event) => {
-              event.currentTarget.hidden = true;
-              event.currentTarget.nextElementSibling.hidden = false;
-            }}
-          />
-        ) : null}
-        <div className="property-card__photo-placeholder" hidden={Boolean(photo)}>
-          <span className="placeholder-mark" aria-hidden="true">⌂</span>
-          <span>No photo available</span>
-        </div>
+        <PropertyImageCarousel photos={property.L_Photos} address={property.L_Address} />
         <span className="property-card__badge">For sale</span>
       </div>
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { fetchProperties, fetchPropertyDetail } from './client.js';
+import { fetchOpenHouses, fetchProperties, fetchPropertyDetail } from './client.js';
 
 test('fetchProperties serializes query parameters and forwards an abort signal', async (context) => {
   const fetchMock = mock.method(globalThis, 'fetch', async () => new Response(
@@ -30,6 +30,18 @@ test('fetchPropertyDetail encodes the listing ID and returns the property', asyn
 
   assert.deepEqual(await fetchPropertyDetail('123'), property);
   assert.equal(fetchMock.mock.calls[0].arguments[0], '/api/properties/123');
+});
+
+test('fetchOpenHouses requests the listing open-house records', async (context) => {
+  const openHouses = [{ OpenHouseDate: '2026-09-27' }];
+  const fetchMock = mock.method(globalThis, 'fetch', async () => new Response(
+    JSON.stringify(openHouses),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  ));
+  context.after(() => fetchMock.mock.restore());
+
+  assert.deepEqual(await fetchOpenHouses('123'), openHouses);
+  assert.equal(fetchMock.mock.calls[0].arguments[0], '/api/properties/123/openhouses');
 });
 
 test('throws the API error message for unsuccessful HTTP responses', async (context) => {
