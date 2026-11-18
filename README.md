@@ -3,10 +3,13 @@
 ## Property search API
 
 The backend serves `GET /api/properties` with optional `city`, `zipcode`,
-`minPrice`, `maxPrice`, `beds`, `baths`, `limit`, and `offset` query parameters.
-The default page is 20 records at offset 0; `limit` must be between 1 and 100.
-The response contains `total`, `limit`, `offset`, and `results`. Invalid or
-unknown query parameters return HTTP 400 with an `error` message.
+`minPrice`, `maxPrice`, `beds`, `baths`, `limit`, `offset`, `sortBy`, and
+`sortOrder` query parameters. The default page is 20 records at offset 0;
+`limit` must be between 1 and 100. Sorting defaults to
+`ListingContractDate DESC`; supported `sortBy` values are the actual SQL
+columns `id`, `L_SystemPrice`, `ListingContractDate`, `LM_Int2_3`, and `L_Keyword2`.
+`sortOrder` accepts `ASC` or `DESC`. Invalid or unknown query parameters return
+HTTP 400 with an `error` message. Results use `id ASC` as a stable tie-breaker.
 
 City search uses the declared `L_City` column and compares
 `LOWER(TRIM(L_City))` with `LOWER(TRIM(?))`, so differences in letter case or
@@ -15,16 +18,36 @@ you may apply
 [`backend/sql/property_search_indexes.sql`](./backend/sql/property_search_indexes.sql)
 to add the filter indexes and a persisted normalized city column.
 
-To check the query plan, run this before applying the index SQL and again after
-it (use the same database and data):
+To inspect the plan for the common beds-plus-price filter, run this before
+applying the index SQL and again after it (use the same database and data):
 
 ```sql
 EXPLAIN SELECT id FROM rets_property
 WHERE L_SystemPrice >= 300000 AND L_Keyword2 = 3;
 ```
 
-Compare the `key` and estimated `rows` columns. The post-index plan should name
-an index in `key` rather than show `NULL`. Also verify all filter indexes:
+The columns in the tabular `EXPLAIN` output are: `id` (select identifier),
+`select_type` (query type), `table` (table read), `partitions` (partitions
+accessed, if any), `type` (access strategy, such as a full `ALL` scan or an
+indexed `range`), `possible_keys` (indexes eligible for the predicates), `key`
+(the chosen index), `key_len` (bytes of the chosen index used), `ref` (values
+or columns compared to the index), `rows` (estimated rows examined),
+`filtered` (estimated percentage surviving the remaining predicates), and
+`Extra` (additional execution details).
+
+On the local MySQL 8.4.11 dataset (55,212 table rows), before the composite
+index the plan used `type=ALL`, `key=NULL`, and estimated 37,424 rows. After
+adding `(L_Keyword2, L_SystemPrice)`, it used `type=range`,
+`key=idx_rets_property_beds_price`, `key_len=10`, and estimated 18,712 rows
+(50% fewer estimated rows). `EXPLAIN ANALYZE` returned the same 17,993 matches;
+the median of three runs was 3.18 ms with the index versus 3,381 ms with
+`IGNORE INDEX (idx_rets_property_beds_price)` to force the table-scan plan.
+These timings are specific to this local dataset and server. The script also
+adds `(L_Zip, L_SystemPrice)` for ZIP-plus-price searches. The script temporarily
+relaxes the session SQL mode because the imported table contains a legacy
+zero-date default; it restores the prior mode after the DDL. An index may not
+be chosen for a small table even when it is valid.
+Also verify the filter indexes:
 
 ```sql
 SHOW INDEXES FROM rets_property;

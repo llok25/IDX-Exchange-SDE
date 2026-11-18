@@ -62,6 +62,7 @@ test('combining minPrice and beds applies both bindings to count and results', a
   assert.equal(calls.length, 2);
   assert.match(calls[0].sql, /L_SystemPrice >= \? AND L_Keyword2 = \?/);
   assert.deepEqual(calls[0].values, [300000, 3]);
+  assert.match(calls[1].sql, /ORDER BY ListingContractDate DESC, id ASC LIMIT \? OFFSET \?$/);
   assert.match(calls[1].sql, /L_SystemPrice >= \? AND L_Keyword2 = \?/);
   assert.deepEqual(calls[1].values, [300000, 3, 20, 0]);
 });
@@ -111,7 +112,43 @@ test('supports pagination parameters and a default page size', () => {
     filters: {},
     limit: 10,
     offset: 20,
+    sortBy: 'ListingContractDate',
+    sortOrder: 'DESC',
   });
+});
+
+test('sorts by whitelisted SQL columns and rejects invalid sort values', async () => {
+  const calls = [];
+  const database = {
+    async execute(sql, values) {
+      calls.push({ sql, values });
+      return sql.startsWith('SELECT COUNT') ? [[{ total: 0 }], []] : [[], []];
+    },
+  };
+
+  await withServer(database, async (url) => {
+    const ascending = await getJson(
+      `${url}?sortBy=L_SystemPrice&sortOrder=asc&limit=5&offset=5`,
+    );
+    assert.equal(ascending.status, 200);
+    assert.match(calls[1].sql, /ORDER BY L_SystemPrice ASC, id ASC LIMIT \? OFFSET \?$/);
+    assert.deepEqual(calls[1].values, [5, 5]);
+
+    const descending = await getJson(`${url}?sortBy=L_SystemPrice&sortOrder=DESC`);
+    assert.equal(descending.status, 200);
+    assert.match(calls[3].sql, /ORDER BY L_SystemPrice DESC, id ASC LIMIT \? OFFSET \?$/);
+
+    for (const query of [
+      '?sortBy=ListPrice',
+      '?sortBy=L_SystemPrice%20DESC',
+      '?sortOrder=sideways',
+    ]) {
+      const invalid = await getJson(`${url}${query}`);
+      assert.equal(invalid.status, 400);
+    }
+  });
+
+  assert.equal(calls.length, 4);
 });
 
 test('returns the full property for a listing ID', async () => {

@@ -6,6 +6,7 @@ import PropertyFilters, { EMPTY_FILTERS } from './PropertyFilters.js';
 import Pagination from './Pagination.js';
 
 const DEFAULT_ITEMS_PER_PAGE = 20;
+const DEFAULT_SORT = { sortBy: 'ListingContractDate', sortOrder: 'DESC' };
 
 function nonEmptyFilters(filters) {
   return Object.fromEntries(
@@ -22,6 +23,7 @@ export default function ListingsPage() {
   const [error, setError] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState({});
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const searchController = useRef(null);
@@ -29,6 +31,7 @@ export default function ListingsPage() {
 
   const refreshListings = useCallback((nextFilters) => {
     setCurrentPage(1);
+    setSort(DEFAULT_SORT);
     setAppliedFilters(nonEmptyFilters(nextFilters));
   }, []);
 
@@ -46,6 +49,7 @@ export default function ListingsPage() {
     fetchProperties(
       {
         ...appliedFilters,
+        ...sort,
         limit: itemsPerPage,
         offset: (currentPage - 1) * itemsPerPage,
       },
@@ -72,11 +76,17 @@ export default function ListingsPage() {
         searchController.current = null;
       }
     };
-  }, [appliedFilters, currentPage, itemsPerPage]);
+  }, [appliedFilters, currentPage, itemsPerPage, sort]);
 
   const changePage = useCallback((page) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
+  }, []);
+
+  const changeSort = useCallback((event) => {
+    const { name, value } = event.target;
+    setSort((currentSort) => ({ ...currentSort, [name]: value }));
+    setCurrentPage(1);
   }, []);
 
   const totalPages = Math.ceil(total / itemsPerPage);
@@ -124,7 +134,36 @@ export default function ListingsPage() {
                 : `Showing ${firstResult.toLocaleString('en-US')}-${lastResult.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} properties`}
             </p>
           </div>
-          <span className="toolbar-label">Latest listings</span>
+          <div className="listings__sort" aria-label="Sort properties">
+            <label>
+              <span>Sort by</span>
+              <select name="sortBy" value={sort.sortBy} onChange={changeSort}>
+                <option value="ListingContractDate">Date listed</option>
+                <option value="L_SystemPrice">Price</option>
+                <option value="LM_Int2_3">Square footage</option>
+                <option value="L_Keyword2">Beds</option>
+              </select>
+            </label>
+            <label>
+              <span>Order</span>
+              <select name="sortOrder" value={sort.sortOrder} onChange={changeSort}>
+                <option value="ASC">
+                  {sort.sortBy === 'ListingContractDate'
+                    ? 'Oldest first'
+                    : sort.sortBy === 'L_SystemPrice'
+                      ? 'Price: low to high'
+                      : 'Lowest first'}
+                </option>
+                <option value="DESC">
+                  {sort.sortBy === 'ListingContractDate'
+                    ? 'Newest first'
+                    : sort.sortBy === 'L_SystemPrice'
+                      ? 'Price: high to low'
+                      : 'Highest first'}
+                </option>
+              </select>
+            </label>
+          </div>
         </div>
 
         {loading ? (

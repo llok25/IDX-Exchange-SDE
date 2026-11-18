@@ -10,7 +10,17 @@ const ALLOWED_PARAMETERS = new Set([
   'baths',
   'limit',
   'offset',
+  'sortBy',
+  'sortOrder',
 ]);
+
+const SORT_COLUMNS = Object.freeze({
+  id: 'id',
+  L_SystemPrice: 'L_SystemPrice',
+  ListingContractDate: 'ListingContractDate',
+  LM_Int2_3: 'LM_Int2_3',
+  L_Keyword2: 'L_Keyword2',
+});
 
 function parseNumber(value, name, { integer = false, min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   const pattern = integer ? /^\d+$/ : /^\d+(?:\.\d+)?$/;
@@ -60,6 +70,18 @@ function parseQuery(query) {
     }
   }
 
+  const sortBy = query.sortBy === undefined ? 'ListingContractDate' : query.sortBy;
+  if (!Object.hasOwn(SORT_COLUMNS, sortBy)) {
+    throw new Error('sortBy must be one of the supported property columns.');
+  }
+
+  const sortOrder = query.sortOrder === undefined
+    ? 'DESC'
+    : query.sortOrder.toUpperCase();
+  if (sortOrder !== 'ASC' && sortOrder !== 'DESC') {
+    throw new Error('sortOrder must be either ASC or DESC.');
+  }
+
   if (
     filters.minPrice !== undefined &&
     filters.maxPrice !== undefined &&
@@ -76,6 +98,8 @@ function parseQuery(query) {
     offset: query.offset === undefined
       ? 0
       : parseNumber(query.offset, 'offset', { integer: true }),
+    sortBy,
+    sortOrder,
   };
 }
 
@@ -139,7 +163,7 @@ function createPropertiesRouter(database = db) {
         [...where.values],
       );
       const [results] = await database.execute(
-        `SELECT * FROM rets_property ${where.sql} ORDER BY id LIMIT ? OFFSET ?`,
+        `SELECT * FROM rets_property ${where.sql} ORDER BY ${SORT_COLUMNS[parsed.sortBy]} ${parsed.sortOrder}, id ASC LIMIT ? OFFSET ?`,
         [...where.values, parsed.limit, parsed.offset],
       );
 
